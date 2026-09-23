@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "local-totp-cli"
+version = "0.1.0"
+description = "Offline TOTP from local QR images, backed by the operating system credential store."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+dependencies = [
+    "pyotp==2.10.0",
+    "keyring==25.7.0",
+    "zxing-cpp==3.1.1",
+    "pillow==12.3.0",
+    "platformdirs==4.11.11",
+    "filelock==4.0.1",
+]
+
+[project.scripts]
+totp = "totp_cli.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8.3,<10", "qrcode>=8,<9", "ruff>=0.13,<1"]
+build = ["pyinstaller==6.22.3"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/totp_cli"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "scripts", ".github", "pyproject.toml", "uv.lock", "requirements.lock", "README.md", "LICENSE"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = ["native: accesses only disposable test entries in the OS credential store"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

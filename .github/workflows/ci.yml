@@ -1,0 +1,65 @@
+name: Test and build TOTP CLI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+        python: ['3.10', '3.14']
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: astral-sh/setup-uv@v10
+      - run: uv sync --locked --group dev
+      - run: uv run --no-sync ruff check src tests scripts
+      - run: uv run --no-sync ruff format --check src tests scripts
+      - run: uv run --no-sync pytest -q -m 'not native'
+      - name: Windows Credential Manager integration
+        if: runner.os == 'Windows'
+        env:
+          TOTP_TEST_NATIVE: '1'
+        run: uv run --no-sync pytest -q tests/test_native.py
+      - name: Windows installed CLI integration
+        if: runner.os == 'Windows'
+        run: uv run --no-sync python scripts/smoke_native.py
+
+  binary:
+    name: Executable (${{ matrix.os }})
+    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - uses: astral-sh/setup-uv@v10
+      - run: uv sync --locked --all-groups
+      - run: uv run --no-sync python scripts/build_binary.py
+      - name: Windows executable integration
+        if: runner.os == 'Windows'
+        run: uv run --no-sync python scripts/smoke_native.py --binary dist/totp.exe
+      - name: macOS/Linux executable startup
+        if: runner.os != 'Windows'
+        run: ./dist/totp --help
+      - uses: actions/upload-artifact@v7
+        with:
+          name: totp-${{ runner.os }}-${{ runner.arch }}
+          path: dist/totp*
+          if-no-files-found: error
